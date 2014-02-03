@@ -28,6 +28,7 @@ class WebServer
 	public WebServer(int port)
 	{
 
+		Log test= new Log(100, false, 6, true, "Server.txt");
 		ServerSocket server= null;
 		Socket sock= null;
 		InputStream in= null;

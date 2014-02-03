@@ -1,3 +1,6 @@
+package part1;
+import jamesLogger.Log;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -10,24 +13,31 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.StringTokenizer;
 
-class WebServer
+class WebServer1
 {
 
 	//
 	public static void main(String args[])
 	{
 
+		WebServer1 server= null;
 		if (args.length != 1)
 		{
-			System.out.println("Usage: WebServer <port>");
-			System.exit(1);
+			System.out.println("Usage: WebServer <port>. \n Defaulting to port: 8080");
+			server= new WebServer1(8080);
 		}
-		WebServer server= new WebServer(Integer.parseInt(args[0]));
+		else
+		{
+			System.out.println("Attempting to start server on port: " + Integer.parseInt(args[0]));
+			server= new WebServer1(Integer.parseInt(args[0]));
+		}
 	}
 
-	public WebServer(int port)
+	public WebServer1(int port)
 	{
 
+		Log log= new Log(100, false, 6, true, "WebServer1.txt");
+		log.resetLog();
 		ServerSocket server= null;
 		Socket sock= null;
 		InputStream in= null;

@@ -22,7 +22,7 @@ class WebServer1 implements Runnable
 	 */
 	ServerSocket	serverSocket	= null;
 
-	Logger			log				= new Logger(1000, false, 6, true, "WebServer1.log", "Log");
+	Logger			log				= new Logger(1000, true, 6, true, "WebServer1.log", "Log");
 
 	//
 	public static void main(String args[])
@@ -58,7 +58,6 @@ class WebServer1 implements Runnable
 
 		this.log.resetLog();
 		this.serverSocket= new ServerSocket(port);
-		// *** close streams and socket appropriately
 		// *** Try to anticipate error conditions (e.g. file not found?)
 	}
 
@@ -153,6 +152,7 @@ class WebServer1 implements Runnable
 					e.printStackTrace();
 				}
 			}
+			this.log.flush();
 
 		}
 

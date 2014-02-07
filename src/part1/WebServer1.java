@@ -1,5 +1,4 @@
 package part1;
-import jamesLogger.Log;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -12,45 +11,159 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.StringTokenizer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-class WebServer1
+import simple.Logger.Logger;
+
+class WebServer1 implements Runnable
 {
+
+	/**
+	 * The server socket used for this instance of WebServer1.
+	 */
+	ServerSocket	serverSocket	= null;
+
+	Logger			log				= new Logger(1000, false, 6, true, "WebServer1.log", "Log");
 
 	//
 	public static void main(String args[])
 	{
 
 		WebServer1 server= null;
-		if (args.length != 1)
+		try
 		{
-			System.out.println("Usage: WebServer <port>. \n Defaulting to port: 8080");
-			server= new WebServer1(8080);
+			if (args.length != 1)
+			{
+				System.out.println("Usage: WebServer <port>. \n Defaulting to port: 8080");
+				server= new WebServer1(8080);
+
+			}
+			else
+			{
+				System.out.println("Attempting to start server on port: " + Integer.parseInt(args[0]));
+				server= new WebServer1(Integer.parseInt(args[0]));
+
+			}
+			new Thread(server).start();
 		}
-		else
+		catch (IOException e)
 		{
-			System.out.println("Attempting to start server on port: " + Integer.parseInt(args[0]));
-			server= new WebServer1(Integer.parseInt(args[0]));
+			// TODO Auto-generated catch block
+			System.out.println("Failed to start server.");
+			e.printStackTrace();
 		}
 	}
 
-	public WebServer1(int port)
+	public WebServer1(int port) throws IOException
 	{
 
-		Log log= new Log(100, false, 6, true, "WebServer1.txt");
-		log.resetLog();
-		ServerSocket server= null;
-		Socket sock= null;
-		InputStream in= null;
-		OutputStream out= null;
-		// *** TASK: Open the server socket on the specified port
-		// *** Loop forever accepting socket requests
-		// *** Process each request in its own thread
-		// *** Get the response bytes from createResponse
-		// *** Write the bytes to the socket's output stream
+		this.log.resetLog();
+		this.serverSocket= new ServerSocket(port);
 		// *** close streams and socket appropriately
 		// *** Try to anticipate error conditions (e.g. file not found?)
 	}
 
+	@Override
+	public void run()
+	{
+
+		// TODO Implement Thread Logic From SockServer6
+		ExecutorService executor= Executors.newCachedThreadPool();
+		while (this.serverSocket.isBound() && !this.serverSocket.isClosed())
+		{
+			try
+			{
+				executor.execute(new Connection(this.serverSocket.accept(), this.log));
+			}
+			catch (IOException e)
+			{
+				this.log.log(1, "Failed to connect properly.");
+			}
+			this.log.log(2, "Active threads: " + Thread.activeCount());
+		}
+	}
+}
+
+/**
+ * This is a worker class for WebServer1. Merely handles the connection to the server and sends the response.
+ * 
+ * @author Owner
+ * 
+ * @version 0.6
+ * 
+ */
+class Connection implements Runnable
+{
+
+	private Socket	socket;
+
+	private Logger	log;
+
+	private InputStream	in;
+
+	private OutputStream	out;
+
+	Connection(Socket sock, Logger log) throws IOException
+	{
+
+		this.log= log;
+		this.socket= sock;
+		this.in= sock.getInputStream();
+		this.out= sock.getOutputStream();
+	}
+	Connection()
+	{
+
+	}
+
+	@Override
+	public void run()
+	{
+
+		byte[] response= this.createResponse(this.in);
+		try
+		{
+			this.out.write(response);
+			this.out.flush();
+		}
+		catch (IOException e)
+		{
+			// TODO Auto-generated catch block
+			this.log.log(1, "Failed to write response.");
+		}
+		finally
+		{
+			try
+			{
+				if (this.socket != null)
+				{
+					this.socket.close();
+				}
+				if (this.in != null)
+				{
+					this.in.close();
+				}
+				if (this.out != null)
+				{
+					this.out.close();
+				}
+			}
+			catch (IOException e)
+			{
+				this.log.log(1, "Something Failed to close.");
+				e.printStackTrace();
+			}
+		}
+
+	}
+
+	/**
+	 * Takes and input stream then returns the byte array associated with the file that the input stream specifies.
+	 * 
+	 * @param inStream
+	 * @return The byte array representing the file.
+	 */
 	public byte[] createResponse(InputStream inStream)
 	{
 
@@ -65,7 +178,7 @@ class WebServer1
 			// example GET format: GET /index.html HTTP/1.1
 			String filename= null;
 			String line= in.readLine();
-			System.out.println("Received: " + line);
+			this.log.log(3, "Received: " + line);
 			if (line != null && !line.trim().equals(""))
 			{
 				// I will use an artificial delay to test your code
@@ -80,7 +193,7 @@ class WebServer1
 					}
 				}
 			}
-			System.out.println("FINISHED REQUEST, STARING RESPONSE\n");
+			this.log.log(3, "FINISHED REQUEST, STARING RESPONSE\n");
 			// Generate an appropriate response to the user
 			if (filename == null)
 			{
@@ -104,13 +217,18 @@ class WebServer1
 			e.printStackTrace();
 			response= ("<html>ERROR: " + e.getMessage() + "</html").getBytes();
 		}
-		System.out.println("RESPONSE GENERATED!");
+		this.log.log(3, "RESPONSE GENERATED!");
 		return response;
 	}
 
 	/**
 	 * Read bytes from a file and return them in the byte array.
 	 * We read in blocks of 512 bytes for efficiency.
+	 * 
+	 * @param f
+	 *            The file to be read in.
+	 * @return The byte array representing the file.
+	 * @throws IOException
 	 */
 	public byte[] readFileInBytes(File f) throws IOException
 	{
@@ -129,4 +247,6 @@ class WebServer1
 		data.close();
 		return result;
 	}
+
+
 }

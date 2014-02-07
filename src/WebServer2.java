@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 
 import simple.Logger.Logger;
 
@@ -35,13 +36,11 @@ class WebServer2 implements Runnable
 			{
 				System.out.println("Usage: WebServer <port>. \n Defaulting to port: 8080");
 				server= new WebServer2(8080);
-
 			}
 			else
 			{
 				System.out.println("Attempting to start server on port: " + Integer.parseInt(args[0]));
 				server= new WebServer2(Integer.parseInt(args[0]));
-
 			}
 			new Thread(server).start();
 		}
@@ -82,7 +81,6 @@ class WebServer2 implements Runnable
 		}
 	}
 
-
 	/**
 	 * This is a worker class for WebServer2. Merely handles the connection to the server and sends the response.
 	 * 
@@ -94,11 +92,11 @@ class WebServer2 implements Runnable
 	class Connection implements Runnable
 	{
 
-		private Socket	socket;
+		private Socket			socket;
 
-		private Logger	log;
+		private Logger			log;
 
-		private InputStream	in;
+		private InputStream		in;
 
 		private OutputStream	out;
 
@@ -110,6 +108,7 @@ class WebServer2 implements Runnable
 			this.in= sock.getInputStream();
 			this.out= sock.getOutputStream();
 		}
+
 		Connection()
 		{
 
@@ -153,7 +152,6 @@ class WebServer2 implements Runnable
 					e.printStackTrace();
 				}
 			}
-
 		}
 
 		/**
@@ -185,6 +183,7 @@ class WebServer2 implements Runnable
 					if (st.nextToken().equals("GET") && st.hasMoreTokens())
 					{
 						filename= st.nextToken();
+						this.log.log(1, filename);
 						if (filename.startsWith("/"))
 						{
 							filename= filename.substring(1);
@@ -196,6 +195,11 @@ class WebServer2 implements Runnable
 				if (filename == null)
 				{
 					response= "<html>Illegal request: no GET</html>".getBytes();
+				}
+				else if (Pattern.compile(Pattern.quote(".cgi?")).split(filename).length == 2)
+				{
+					this.log.log(2, "Cgi Request Recieved");
+					response= this.getCGIResponse(filename);
 				}
 				else
 				{
@@ -217,6 +221,43 @@ class WebServer2 implements Runnable
 			}
 			this.log.log(3, "RESPONSE GENERATED!");
 			return response;
+		}
+
+		private byte[] getCGIResponse(String filename)
+		{
+
+			String[] cgiParams= Pattern.compile(Pattern.quote(".cgi?")).split(filename);
+			/*
+			 * try
+			 * {
+			 * // Should I use this?
+			 * Runtime.getRuntime().exec(cgiParams[0]);
+			 * // Or should i use this?
+			 * ProcessBuilder pb= new ProcessBuilder(cgiParams[0]);
+			 * Map<String,String> env= pb.environment();
+			 * env.clear();
+			 * String[] args= cgiParams[1].split("&");
+			 * for (int i= 0; i < args.length; i++)
+			 * {
+			 * String[] nameValuePair= args[i].split("=");
+			 * env.put(nameValuePair[0], nameValuePair[1]);
+			 * }
+			 * pb.directory(new File("myDir"));
+			 * File log= new File("log");
+			 * pb.redirectErrorStream(true);
+			 * pb.redirectOutput(Redirect.appendTo(log));
+			 * Process p= pb.start();
+			 * assert pb.redirectInput() == Redirect.PIPE;
+			 * assert pb.redirectOutput().file() == log;
+			 * assert p.getInputStream().read() == -1;
+			 * }
+			 * catch (IOException e)
+			 * {
+			 * // TODO Auto-generated catch block
+			 * e.printStackTrace();
+			 * }
+			 */
+			return "Testing cgi!".getBytes();
 		}
 
 		/**
@@ -245,7 +286,5 @@ class WebServer2 implements Runnable
 			data.close();
 			return result;
 		}
-
-
 	}
 }

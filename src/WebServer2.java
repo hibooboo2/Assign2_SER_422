@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.lang.ProcessBuilder.Redirect;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Map;
@@ -242,7 +241,7 @@ class WebServer2 implements Runnable
 			//pb.directory(new File("myDir"));
 			File log= new File("log");
 			pb.redirectErrorStream(true);
-			pb.redirectOutput(Redirect.appendTo(log));
+			// pb.redirectOutput(Redirect.appendTo(log));
 			Process p= pb.start();
 			InputStream dataOut= p.getInputStream();
 			// assert pb.redirectInput() == Redirect.PIPE;

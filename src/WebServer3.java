@@ -2,12 +2,14 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
@@ -16,7 +18,7 @@ import java.util.regex.Pattern;
 
 import simple.Logger.Logger;
 
-class WebServer2 implements Runnable
+class WebServer3 implements Runnable
 {
 
 	/**
@@ -24,24 +26,24 @@ class WebServer2 implements Runnable
 	 */
 	ServerSocket	serverSocket	= null;
 
-	Logger			log				= new Logger(1000, true, 6, true, "WebServer2.log", "Log");
+	Logger			log				= new Logger(1000, true, 6, true, "WebServer3.log", "Log");
 
 	//
 	public static void main(String args[])
 	{
 
-		WebServer2 server= null;
+		WebServer3 server= null;
 		try
 		{
 			if (args.length != 1)
 			{
 				System.out.println("Usage: WebServer <port>. \n Defaulting to port: 8080");
-				server= new WebServer2(8080);
+				server= new WebServer3(8080);
 			}
 			else
 			{
 				System.out.println("Attempting to start server on port: " + Integer.parseInt(args[0]));
-				server= new WebServer2(Integer.parseInt(args[0]));
+				server= new WebServer3(Integer.parseInt(args[0]));
 			}
 			new Thread(server).start();
 		}
@@ -53,7 +55,7 @@ class WebServer2 implements Runnable
 		}
 	}
 
-	public WebServer2(int port) throws IOException
+	public WebServer3(int port) throws IOException
 	{
 
 		this.log.resetLog();
@@ -197,10 +199,15 @@ class WebServer2 implements Runnable
 				{
 					response= "<html>Illegal request: no GET</html>".getBytes();
 				}
-				else if (Pattern.compile(Pattern.quote(".cgi?")).split(filename).length == 2)
+				else if (filename.contains(".cgi?"))
 				{
 					this.log.log(2, "Cgi Request Recieved");
 					response= this.getCGIResponse(filename);
+				}
+				else if (filename.contains(".ssi?"))
+				{
+					this.log.log(2, "SSI Request Recieved");
+					response= this.getSSIResponse(filename);
 				}
 				else
 				{
@@ -218,7 +225,7 @@ class WebServer2 implements Runnable
 			catch (IOException | InterruptedException e)
 			{
 				e.printStackTrace();
-				response= ("<html>ERROR: " + e.getMessage() + "</html").getBytes();
+				response= ("<html>ERROR: " + e.getMessage() + "</html>").getBytes();
 			}
 			this.log.log(3, "RESPONSE GENERATED!");
 			return response;
@@ -231,18 +238,21 @@ class WebServer2 implements Runnable
 			ProcessBuilder pb= new ProcessBuilder(cgiParams[0]);
 			Map<String,String> env= pb.environment();
 			// env.clear();
-			String[] args= cgiParams[1].split("&");
-			for (int i= 0; i < args.length; i++)
+			if (cgiParams.length > 1)
 			{
-				String[] nameValuePair= args[i].split("=");
-				if (!env.containsKey(nameValuePair[0]))
+				String[] args= cgiParams[1].split("&");
+				for (int i= 0; i < args.length; i++)
 				{
-					env.put(nameValuePair[0], nameValuePair[1]);
-				}
-				else
-				{
-					return ("<html>ERROR: " + nameValuePair[0] + " is already an environment variable. Cannot assign it to"
-							+ nameValuePair[1] + ".</html").getBytes();
+					String[] nameValuePair= args[i].split("=");
+					if (!env.containsKey(nameValuePair[0]))
+					{
+						env.put(nameValuePair[0], nameValuePair[1]);
+					}
+					else
+					{
+						return ("<html>ERROR: " + nameValuePair[0] + " is already an environment variable. Cannot assign it to"
+								+ nameValuePair[1] + ".</html>").getBytes();
+					}
 				}
 			}
 			Process p= pb.start();
@@ -265,8 +275,92 @@ class WebServer2 implements Runnable
 			}
 			else
 			{
-				return ("<html>ERROR: Cgi Terminated. Exit code= " + exitcode + " </html").getBytes();
+				return ("<html>ERROR: Cgi Terminated. Exit code= " + exitcode + " </html>").getBytes();
 			}
+		}
+
+		/**
+		 * Takes a String and returns a byte array representing the output from an SSI.
+		 * 
+		 * @param urlInput
+		 * @return The byte array representing the Response.
+		 * @throws IOException
+		 * @throws InterruptedException
+		 */
+		private byte[] getSSIResponse(String urlInput) throws IOException, InterruptedException
+		{
+
+			String[] SSIStrings= Pattern.compile(Pattern.quote("?")).split(urlInput);
+			this.log.log(2, SSIStrings[0] + " is the ssi String");
+			HashMap<String,String> args= new HashMap<String,String>();
+			if (SSIStrings.length > 1)
+			{
+				String[] argsPairs= SSIStrings[1].split("&");
+
+				for (int i= 0; i < argsPairs.length; i++)
+				{
+					String[] nameValuePair= argsPairs[i].split("=");
+					args.put(nameValuePair[0], nameValuePair[1]);
+				}
+			}
+			String response= "";
+			File file= new File(SSIStrings[0]);
+			if (file.exists())
+			{
+				BufferedReader reader= new BufferedReader(new FileReader(SSIStrings[0]));
+				String line;
+
+				// Reads file line by line
+				while ((line= reader.readLine()) != null)
+				{
+					if (line.contains("$$$$$"))
+					{
+						line= line.replace("$$$$$ ", "");
+						String[] splitLine= line.trim().split(" ");
+						for (int i= 0; i < splitLine.length; i++)
+						{
+							splitLine[i]= splitLine[i].replace("$", "");
+							if (args.containsKey(new String(splitLine[i])))
+							{
+								splitLine[i]= args.get(splitLine[i]);
+							}
+						}
+						Process p= Runtime.getRuntime().exec(splitLine);
+						InputStream dataOut= p.getInputStream();
+						int exitcode = p.waitFor();
+						if (exitcode == 0)
+						{
+							ByteArrayOutputStream data= new ByteArrayOutputStream(dataOut.available());
+							byte buffer[]= new byte[512];
+							int numRead= dataOut.read(buffer);
+							while (numRead > 0)
+							{
+								data.write(buffer, 0, numRead);
+								numRead= dataOut.read(buffer);
+							}
+							dataOut.close();
+							byte[] result= data.toByteArray();
+							data.close();
+							response+= new String(result);
+						}
+						else
+						{
+							response+= ("<html>ERROR: SSI Terminated. Exit code= " + exitcode + " </html>");
+						}
+					}
+					else
+					{
+						response+= line;
+						response+= "\n";
+					}
+				}
+				reader.close();
+			}
+			else
+			{
+				throw new IOException("SSI File not found");
+			}
+			return response.getBytes();
 		}
 
 		/**
